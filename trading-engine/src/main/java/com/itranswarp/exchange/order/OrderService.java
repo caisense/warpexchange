@@ -17,17 +17,17 @@ import com.itranswarp.exchange.model.trade.OrderEntity;
 
 @Component
 public class OrderService {
-
+    // 引用AssetService:
     final AssetService assetService;
 
     public OrderService(@Autowired AssetService assetService) {
         this.assetService = assetService;
     }
 
-    // 跟踪所有活动订单:
+    // 跟踪所有活动订单map: OrderID => OrderEntity
     final ConcurrentMap<Long, OrderEntity> activeOrders = new ConcurrentHashMap<>();
 
-    // 跟踪用户活动订单:
+    // 跟踪用户活动订单: UserID => Map(OrderID => OrderEntity)
     final ConcurrentMap<Long, ConcurrentMap<Long, OrderEntity>> userOrders = new ConcurrentHashMap<>();
 
     /**
@@ -50,6 +50,7 @@ public class OrderService {
         }
         default -> throw new IllegalArgumentException("Invalid direction.");
         }
+        // 实例化Order:
         OrderEntity order = new OrderEntity();
         order.id = orderId;
         order.sequenceId = sequenceId;
@@ -83,7 +84,12 @@ public class OrderService {
         return this.userOrders.get(userId);
     }
 
-    // 删除活动订单:
+
+    /**
+     * 删除活动订单
+     * （必须从activeOrders和userOrders中全部成功删除，否则会造成OrderService内部状态混乱。
+     * @param orderId
+     */
     public void removeOrder(Long orderId) {
         // 从ActiveOrders中删除:
         OrderEntity removed = this.activeOrders.remove(orderId);

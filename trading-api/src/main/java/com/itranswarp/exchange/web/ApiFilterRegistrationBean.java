@@ -69,9 +69,11 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
                 sendErrorResponse(response, e);
                 return;
             }
+            // 匿名身份
             if (userId == null) {
                 chain.doFilter(request, response);
             } else {
+                // 用户身份
                 try (UserContext ctx = new UserContext(userId)) {
                     chain.doFilter(request, response);
                 }
@@ -80,6 +82,7 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
 
         Long parseUser(HttpServletRequest request) {
             // 尝试通过Authorization Header认证用户:
+            // 格式：【Basic 用户名:口令】
             String auth = request.getHeader("Authorization");
             if (auth != null) {
                 return parseUserFromAuthorization(auth);
@@ -95,7 +98,9 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
 
         Long parseUserFromAuthorization(String auth) {
             if (auth.startsWith("Basic ")) {
+                // 用Base64解码
                 String eap = new String(Base64.getDecoder().decode(auth.substring(6)), StandardCharsets.UTF_8);
+                // 分离email:password
                 int pos = eap.indexOf(':');
                 if (pos < 1) {
                     throw new ApiException(ApiError.AUTH_SIGNIN_FAILED, "Invalid email or password.");

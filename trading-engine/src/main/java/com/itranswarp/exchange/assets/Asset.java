@@ -4,10 +4,13 @@ import java.math.BigDecimal;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * 资产类
+ */
 public class Asset {
-
+    // 可用余额
     BigDecimal available;
-
+    // 冻结余额
     BigDecimal frozen;
 
     public Asset() {

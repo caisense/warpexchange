@@ -32,19 +32,27 @@ public class SequenceHandler extends AbstractDbService {
     public List<AbstractEvent> sequenceMessages(final MessageTypes messageTypes, final AtomicLong sequence,
             final List<AbstractEvent> messages) throws Exception {
         final long t = System.currentTimeMillis();
+        // 防止时钟回退
         if (t < this.lastTimestamp) {
             logger.warn("[Sequence] current time {} is turned back from {}!", t, this.lastTimestamp);
         } else {
             this.lastTimestamp = t;
         }
+        // UniqueEventEntity列表，利用它去重
         List<UniqueEventEntity> uniques = null;
         Set<String> uniqueKeys = null;
+        // 结果集
         List<AbstractEvent> sequencedMessages = new ArrayList<>(messages.size());
+        // 入库的eventList
         List<EventEntity> events = new ArrayList<>(messages.size());
+        // 主循环：遍历每条消息
         for (AbstractEvent message : messages) {
             UniqueEventEntity unique = null;
+            // uniqueId是消息中的全局唯一标识
             final String uniqueId = message.uniqueId;
             // check uniqueId:
+            // 在【内存】或【数据库】中查找uniqueId，看是否存在
+            // 存在则跳过
             if (uniqueId != null) {
                 if ((uniqueKeys != null && uniqueKeys.contains(uniqueId))
                         || db.fetch(UniqueEventEntity.class, uniqueId) != null) {
@@ -65,7 +73,9 @@ public class SequenceHandler extends AbstractDbService {
                 logger.info("unique event {} sequenced.", uniqueId);
             }
 
+            // 生成上次定序id
             final long previousId = sequence.get();
+            // 生成本次定序id
             final long currentId = sequence.incrementAndGet();
 
             // 先设置message的sequenceId / previouseId / createdAt，再序列化并落库:
@@ -79,10 +89,12 @@ public class SequenceHandler extends AbstractDbService {
             }
 
             // create AbstractEvent and save to db later:
+            // 准备【批量】入库的eventList
             EventEntity event = new EventEntity();
             event.previousId = previousId;
             event.sequenceId = currentId;
 
+            // 将数据json序列化
             event.data = messageTypes.serialize(message);
             event.createdAt = this.lastTimestamp; // same as message.createdAt
             events.add(event);
@@ -91,6 +103,7 @@ public class SequenceHandler extends AbstractDbService {
             sequencedMessages.add(message);
         }
 
+        // UniqueEvent 和 Event 批量入库
         if (uniques != null) {
             db.insert(uniques);
         }
@@ -99,6 +112,7 @@ public class SequenceHandler extends AbstractDbService {
     }
 
     public long getMaxSequenceId() {
+        // 获取当前库里最大的id
         EventEntity last = db.from(EventEntity.class).orderBy("sequenceId").desc().first();
         if (last == null) {
             logger.info("no max sequenceId found. set max sequenceId = 0.");

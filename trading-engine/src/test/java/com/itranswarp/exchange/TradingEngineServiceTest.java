@@ -32,16 +32,20 @@ public class TradingEngineServiceTest {
 
     @Test
     public void testTradingEngine() {
+        // 创建交易引擎，包括资产、订单、清算服务和撮合引擎
         var engine = createTradingEngine();
 
+        // 存款
         engine.processEvent(depositEvent(USER_A, AssetEnum.USD, bd("58000")));
         engine.processEvent(depositEvent(USER_B, AssetEnum.USD, bd("126700")));
         engine.processEvent(depositEvent(USER_C, AssetEnum.BTC, bd("5.5")));
         engine.processEvent(depositEvent(USER_D, AssetEnum.BTC, bd("8.6")));
 
+        // 验证
         engine.debug();
         engine.validate();
 
+        // 交易
         engine.processEvent(orderRequestEvent(USER_A, Direction.BUY, bd("2207.33"), bd("1.2")));
         engine.processEvent(orderRequestEvent(USER_C, Direction.SELL, bd("2215.6"), bd("0.8")));
         engine.processEvent(orderRequestEvent(USER_C, Direction.SELL, bd("2921.1"), bd("0.3")));
@@ -59,6 +63,7 @@ public class TradingEngineServiceTest {
         engine.debug();
         engine.validate();
 
+        // 取消交易
         engine.processEvent(orderCancelEvent(USER_A, 1L));
 
         engine.debug();

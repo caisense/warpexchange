@@ -9,25 +9,37 @@ import com.itranswarp.exchange.enums.Direction;
 import com.itranswarp.exchange.enums.OrderStatus;
 import com.itranswarp.exchange.model.trade.OrderEntity;
 
+/**
+ * 撮合引擎
+ */
 @Component
 public class MatchEngine {
 
-    public final OrderBook buyBook = new OrderBook(Direction.BUY);
-    public final OrderBook sellBook = new OrderBook(Direction.SELL);
+    public final OrderBook buyBook = new OrderBook(Direction.BUY); // 买盘
+    public final OrderBook sellBook = new OrderBook(Direction.SELL); // 卖盘
     public BigDecimal marketPrice = BigDecimal.ZERO; // 最新市场价
-    private long sequenceId;
+    private long sequenceId; // 上次处理的Sequence ID
 
+    /**
+     * 撮合
+     * @param sequenceId
+     * @param order
+     * @return
+     */
     public MatchResult processOrder(long sequenceId, OrderEntity order) {
         return switch (order.direction) {
+            // 买单与sellBook匹配，（如果还有剩）最后放入buyBook:
         case BUY -> processOrder(sequenceId, order, this.sellBook, this.buyBook);
+        // 卖单与buyBook匹配，（如果还有剩）最后放入sellBook:
         case SELL -> processOrder(sequenceId, order, this.buyBook, this.sellBook);
         default -> throw new IllegalArgumentException("Invalid direction.");
         };
     }
 
     /**
-     * @param takerOrder  输入订单
-     * @param makerBook   尝试匹配成交的OrderBook
+     * @param sequenceId 定序id
+     * @param takerOrder  当前正在处理的订单
+     * @param makerBook   尝试匹配成交的OrderBook（对手盘）
      * @param anotherBook 未能完全成交后挂单的OrderBook
      * @return 成交结果
      */
@@ -37,6 +49,7 @@ public class MatchEngine {
         long ts = takerOrder.createdAt;
         MatchResult matchResult = new MatchResult(takerOrder);
         BigDecimal takerUnfilledQuantity = takerOrder.quantity;
+        // 一直循环，每次取maker（对手盘）第一个，目标是将taker完全匹配完
         for (;;) {
             OrderEntity makerOrder = makerBook.getFirst();
             if (makerOrder == null) {
@@ -54,12 +67,14 @@ public class MatchEngine {
             this.marketPrice = makerOrder.price;
             // 待成交数量为两者较小值:
             BigDecimal matchedQuantity = takerUnfilledQuantity.min(makerOrder.unfilledQuantity);
-            // 成交记录:
+            // 成交记录:（价格、数量、maker
             matchResult.add(makerOrder.price, matchedQuantity, makerOrder);
             // 更新成交后的订单数量:
+            // taker数量减去待成交数量
             takerUnfilledQuantity = takerUnfilledQuantity.subtract(matchedQuantity);
             BigDecimal makerUnfilledQuantity = makerOrder.unfilledQuantity.subtract(matchedQuantity);
             // 对手盘完全成交后，从订单簿中删除:
+            // 即看成交后的订单数是否为0
             if (makerUnfilledQuantity.signum() == 0) {
                 makerOrder.updateOrder(makerUnfilledQuantity, OrderStatus.FULLY_FILLED, ts);
                 makerBook.remove(makerOrder);
@@ -72,8 +87,8 @@ public class MatchEngine {
                 takerOrder.updateOrder(takerUnfilledQuantity, OrderStatus.FULLY_FILLED, ts);
                 break;
             }
-        }
-        // Taker订单未完全成交时，放入订单簿:
+        } // end for
+        // Taker订单未完全成交时，放入买/卖订单簿:
         if (takerUnfilledQuantity.signum() > 0) {
             takerOrder.updateOrder(takerUnfilledQuantity,
                     takerUnfilledQuantity.compareTo(takerOrder.quantity) == 0 ? OrderStatus.PENDING

@@ -40,6 +40,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
 
     private MessageProducer<AbstractEvent> messageProducer;
 
+    // 全局唯一递增id
     private AtomicLong sequence;
     private Thread jobThread;
     private boolean running;
@@ -54,6 +55,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
                     AbstractEvent.class);
 
             // find max event id:
+            // 获取当前库里最大的id，作为本次初始化后的起始id
             this.sequence = new AtomicLong(this.sequenceHandler.getMaxSequenceId());
 
             // init consumer:
@@ -110,6 +112,10 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
         this.messageProducer.sendMessages(messages);
     }
 
+    /**
+     * 接收消息并定序发送
+     * @param messages
+     */
     private synchronized void processMessages(List<AbstractEvent> messages) {
         if (!running || crash) {
             panic();
@@ -119,8 +125,10 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
             logger.info("do sequence for {} messages...", messages.size());
         }
         long start = System.currentTimeMillis();
+        // 定序后的事件消息
         List<AbstractEvent> sequenced = null;
         try {
+            // 定序
             sequenced = this.sequenceHandler.sequenceMessages(this.messageTypes, this.sequence, messages);
         } catch (Throwable e) {
             logger.error("exception when do sequence", e);
@@ -134,6 +142,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
             logger.info("sequenced {} messages in {} ms. current sequence id: {}", messages.size(), (end - start),
                     this.sequence.get());
         }
+        // 发送定序后的消息
         sendMessages(sequenced);
     }
 

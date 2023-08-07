@@ -122,10 +122,12 @@ public class TradingEngineService extends LoggerSupport {
         this.tickThread.start();
         this.notifyThread = new Thread(this::runNotifyThread, "async-notify");
         this.notifyThread.start();
+        // 异步输出OrderBook线程
         this.orderBookThread = new Thread(this::runOrderBookThread, "async-orderbook");
         this.orderBookThread.start();
         this.apiResultThread = new Thread(this::runApiResultThread, "async-api-result");
         this.apiResultThread.start();
+        // 异步落库线程
         this.dbThread = new Thread(this::runDbThread, "async-db");
         this.dbThread.start();
     }
@@ -291,6 +293,11 @@ public class TradingEngineService extends LoggerSupport {
         }
     }
 
+    /**
+     * 处理消息
+     * （交易引擎由事件驱动，因此，通过订阅Kafka的Topic实现批量读消息，然后依次处理每个事件
+     * @param messages
+     */
     public void processMessages(List<AbstractEvent> messages) {
         this.orderBookChanged = false;
         for (AbstractEvent message : messages) {
@@ -306,10 +313,12 @@ public class TradingEngineService extends LoggerSupport {
         if (this.fatalError) {
             return;
         }
+        // 重复消息，丢弃
         if (event.sequenceId <= this.lastSequenceId) {
             logger.warn("skip duplicate event: {}", event);
             return;
         }
+        // 如果丢失了消息，从数据库读取丢失的消息，逐个处理
         if (event.previousId > this.lastSequenceId) {
             logger.warn("event lost: expected previous id {} but actual {} for event {}", this.lastSequenceId,
                     event.previousId, event);
@@ -324,6 +333,7 @@ public class TradingEngineService extends LoggerSupport {
             }
             return;
         }
+        // 当前消息不指向上一条消息
         if (event.previousId != lastSequenceId) {
             logger.error("bad event: expected previous id {} but actual {} for event: {}", this.lastSequenceId,
                     event.previousId, event);
@@ -333,6 +343,7 @@ public class TradingEngineService extends LoggerSupport {
         if (logger.isDebugEnabled()) {
             logger.debug("process event {} -> {}: {}...", this.lastSequenceId, event.sequenceId, event);
         }
+        // 核心逻辑：根据事件类型处理
         try {
             if (event instanceof OrderRequestEvent) {
                 createOrder((OrderRequestEvent) event);
@@ -376,6 +387,7 @@ public class TradingEngineService extends LoggerSupport {
         ZonedDateTime zdt = Instant.ofEpochMilli(event.createdAt).atZone(zoneId);
         int year = zdt.getYear();
         int month = zdt.getMonth().getValue();
+        // 1、生成orderId，创建order
         long orderId = event.sequenceId * 10000 + (year * 100 + month);
         OrderEntity order = this.orderService.createOrder(event.sequenceId, event.createdAt, orderId, event.userId,
                 event.direction, event.price, event.quantity);
@@ -385,7 +397,9 @@ public class TradingEngineService extends LoggerSupport {
             this.apiResultQueue.add(ApiResultMessage.createOrderFailed(event.refId, event.createdAt));
             return;
         }
+        // 2、撮合
         MatchResult result = this.matchEngine.processOrder(event.sequenceId, order);
+        // 3、清算
         this.clearingService.clearMatchResult(result);
         // 推送成功结果,注意必须复制一份OrderEntity,因为将异步序列化:
         this.apiResultQueue.add(ApiResultMessage.orderSuccess(event.refId, order.copy(), event.createdAt));
@@ -496,11 +510,14 @@ public class TradingEngineService extends LoggerSupport {
 
     void validateAssets() {
         // 验证系统资产完整性:
+        // 累加所有资产
         BigDecimal totalUSD = BigDecimal.ZERO;
         BigDecimal totalBTC = BigDecimal.ZERO;
+        // 验证资产表每个用户的资产
         for (Entry<Long, ConcurrentMap<AssetEnum, Asset>> userEntry : this.assetService.getUserAssets().entrySet()) {
             Long userId = userEntry.getKey();
             ConcurrentMap<AssetEnum, Asset> assets = userEntry.getValue();
+            // 验证该用户的所有类型资产
             for (Entry<AssetEnum, Asset> entry : assets.entrySet()) {
                 AssetEnum assetId = entry.getKey();
                 Asset asset = entry.getValue();

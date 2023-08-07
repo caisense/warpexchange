@@ -12,13 +12,17 @@ import com.itranswarp.exchange.model.trade.OrderEntity;
 
 import java.util.TreeMap;
 
+/**
+ * 订单薄（增删改都是对红黑树操作
+ */
 public class OrderBook {
 
-    public final Direction direction;
-    public final TreeMap<OrderKey, OrderEntity> book;
+    public final Direction direction; // 排序方向
+    public final TreeMap<OrderKey, OrderEntity> book; // 排序树
 
     public OrderBook(Direction direction) {
         this.direction = direction;
+        // 根据direction（买or卖）排序
         this.book = new TreeMap<>(direction == Direction.BUY ? SORT_BUY : SORT_SELL);
     }
 

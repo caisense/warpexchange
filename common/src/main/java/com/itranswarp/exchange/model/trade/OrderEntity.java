@@ -31,12 +31,14 @@ public class OrderEntity implements EntitySupport, Comparable<OrderEntity> {
 
     /**
      * event id (a.k.a sequenceId) that create this order. ASC only.
+     * 定序id
      */
     @Column(nullable = false, updatable = false)
     public long sequenceId;
 
     /**
      * Order direction.
+     * 买/卖
      */
     @Column(nullable = false, updatable = false, length = VAR_ENUM)
     public Direction direction;
@@ -89,12 +91,14 @@ public class OrderEntity implements EntitySupport, Comparable<OrderEntity> {
 
     /**
      * The order quantity. MUST NOT change after insert.
+     * 订单数量
      */
     @Column(nullable = false, updatable = false, precision = PRECISION, scale = SCALE)
     public BigDecimal quantity;
 
     /**
      * How much unfilled during match.
+     * 未成交数量
      */
     @Column(nullable = false, updatable = false, precision = PRECISION, scale = SCALE)
     public BigDecimal unfilledQuantity;

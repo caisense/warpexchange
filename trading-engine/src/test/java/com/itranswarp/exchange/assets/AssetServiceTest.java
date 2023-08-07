@@ -12,7 +12,7 @@ import com.itranswarp.exchange.enums.AssetEnum;
 
 public class AssetServiceTest {
 
-    static final Long DEBT = 1L;
+    static final Long DEBT = 1L;  // 系统负债
     static final Long USER_A = 2000L;
     static final Long USER_B = 3000L;
     static final Long USER_C = 4000L;
@@ -104,6 +104,7 @@ public class AssetServiceTest {
      * C: BTC=34
      */
     void init() {
+        // 充值，相当于系统给用户转账，无需校验余额，checkBalance=false
         service.tryTransfer(Transfer.AVAILABLE_TO_AVAILABLE, DEBT, USER_A, AssetEnum.USD, BigDecimal.valueOf(12300),
                 false);
         service.tryTransfer(Transfer.AVAILABLE_TO_AVAILABLE, DEBT, USER_A, AssetEnum.BTC, BigDecimal.valueOf(12),

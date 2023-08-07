@@ -17,12 +17,14 @@ public class UniqueEventEntity implements EntitySupport {
 
     /**
      * Which event associated.
+     * 定序id
      */
     @Column(nullable = false, updatable = false)
     public long sequenceId;
 
     /**
      * Created time (milliseconds). Set after sequenced.
+     * 创建时间
      */
     @Column(nullable = false, updatable = false)
     public long createdAt;
