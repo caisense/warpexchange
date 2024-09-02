@@ -37,6 +37,7 @@ public record AuthToken(Long userId, long expiresAt) {
         if (ss.length != 3) {
             throw new IllegalArgumentException("Invalid token.");
         }
+        // 来源于toSecureString方法，secureString = userId : expiresAt : hash
         String uid = ss[0];
         String expires = ss[1];
         String sig = ss[2];

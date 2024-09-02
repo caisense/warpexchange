@@ -59,10 +59,10 @@ public class QuotationService extends LoggerSupport {
 
     @PostConstruct
     public void init() throws Exception {
-        // init redis:
+        // init redis，加载lua脚本:
         this.shaUpdateRecentTicksLua = this.redisService.loadScriptFromClassPath("/redis/update-recent-ticks.lua");
         this.shaUpdateBarLua = this.redisService.loadScriptFromClassPath("/redis/update-bar.lua");
-        // init mq:
+        // init mq，接收Tick消息:
         String groupId = Messaging.Topic.TICK.name() + "_" + IpUtil.getHostId();
         this.tickConsumer = messagingFactory.createBatchMessageListener(Messaging.Topic.TICK, groupId,
                 this::processMessages);
@@ -76,12 +76,14 @@ public class QuotationService extends LoggerSupport {
         }
     }
 
+    // 处理接收的消息
     public void processMessages(List<AbstractMessage> messages) {
         for (AbstractMessage message : messages) {
             processMessage((TickMessage) message);
         }
     }
 
+    // 处理一个Tick消息:
     void processMessage(TickMessage message) {
         // 忽略重复的消息:
         if (message.sequenceId < this.sequenceId) {
@@ -90,7 +92,8 @@ public class QuotationService extends LoggerSupport {
         if (logger.isDebugEnabled()) {
             logger.debug("process ticks: sequenceId = {}, {} ticks...", message.sequenceId, message.ticks.size());
         }
-        // 生成[tick, tick...]列表以及合并为一个Bar:
+        // 对一个Tick消息中的多个Tick先进行合并。
+        // 生成[tick, tick...]列表以及合并为一个Bar（k线）:
         this.sequenceId = message.sequenceId;
         final long createdAt = message.createdAt;
         StringJoiner ticksStrJoiner = new StringJoiner(",", "[", "]");
@@ -117,7 +120,7 @@ public class QuotationService extends LoggerSupport {
             }
             quantity = quantity.add(tick.quantity);
         }
-
+        // 计算应该合并的每种类型的Bar的开始时间
         long sec = createdAt / 1000;
         long min = sec / 60;
         long hour = min / 60;
@@ -126,7 +129,8 @@ public class QuotationService extends LoggerSupport {
         long hourStartTime = hour * 3600 * 1000; // 小时K的开始时间
         long dayStartTime = Instant.ofEpochMilli(hourStartTime).atZone(zoneId).withHour(0).toEpochSecond() * 1000; // 日K的开始时间，与TimeZone相关
 
-        // 更新Redis最近的Ticks缓存:
+        // ******************** k线数据准备完毕 ***************************
+        // 1、更新Redis最近的Ticks缓存:
         String ticksData = ticksJoiner.toString();
         if (logger.isDebugEnabled()) {
             logger.debug("generated ticks data: {}", ticksData);
@@ -138,10 +142,10 @@ public class QuotationService extends LoggerSupport {
             logger.warn("ticks are ignored by Redis.");
             return;
         }
-        // 保存Tick至数据库:
+        // 2、保存Tick至数据库:
         this.quotationDbService.saveTicks(message.ticks);
 
-        // 更新各种类型的K线:
+        // 3、更新redis各种类型的K线:
         String strCreatedBars = redisService.executeScriptReturnString(this.shaUpdateBarLua,
                 new String[] { RedisCache.Key.SEC_BARS, RedisCache.Key.MIN_BARS, RedisCache.Key.HOUR_BARS,
                         RedisCache.Key.DAY_BARS },

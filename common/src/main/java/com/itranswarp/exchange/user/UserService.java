@@ -66,6 +66,8 @@ public class UserService extends AbstractDbService {
             throw new ApiException(ApiError.USER_CANNOT_SIGNIN);
         }
         // check password hash:
+        // 加盐哈希：hash(输入密码+随机数)
+        // 然后与db存的hash值比对
         String hash = HashUtil.hmacSha256(passwd, pa.random);
         if (!hash.equals(pa.passwd)) {
             throw new ApiException(ApiError.AUTH_SIGNIN_FAILED);

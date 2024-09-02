@@ -63,7 +63,7 @@ public class ExchangeConfiguration {
         this.sessionTimeout = sessionTimeout;
     }
 
-    public ApiEndpoints getApiEndpoints() {
+    public ApiEndpoints getApiEndpoints()  {
         return apiEndpoints;
     }
 

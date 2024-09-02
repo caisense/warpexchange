@@ -158,6 +158,7 @@ public class MvcController extends LoggerSupport {
         restClient.post(Map.class, "/internal/transfer", null, req);
     }
 
+    // 显示登录页
     @GetMapping("/signin")
     public ModelAndView signin(HttpServletRequest request) {
         if (UserContext.getUserId() != null) {
@@ -167,7 +168,7 @@ public class MvcController extends LoggerSupport {
     }
 
     /**
-     * Do sign in.
+     * Do sign in. 处理登录
      */
     @PostMapping("/signin")
     public ModelAndView signIn(@RequestParam("email") String email, @RequestParam("password") String password,
@@ -181,18 +182,20 @@ public class MvcController extends LoggerSupport {
         email = email.toLowerCase();
         try {
             UserProfileEntity userProfile = userService.signin(email, password);
-            // sign in ok and set cookie:
+            // sign in ok and set cookie，登录成功后设置cookie:
             AuthToken token = new AuthToken(userProfile.userId,
                     System.currentTimeMillis() + 1000 * cookieService.getExpiresInSeconds());
             cookieService.setSessionCookie(request, response, token);
         } catch (ApiException e) {
+            // 登录失败
             logger.warn("sign in failed for " + e.getMessage(), e);
             return prepareModelAndView("signin", Map.of("email", email, "error", "Invalid email or password."));
         } catch (Exception e) {
+            // 登录失败
             logger.warn("sign in failed for " + e.getMessage(), e);
             return prepareModelAndView("signin", Map.of("email", email, "error", "Internal server error."));
         }
-
+        // 登录成功跳转
         logger.info("signin ok.");
         return redirect("/");
     }

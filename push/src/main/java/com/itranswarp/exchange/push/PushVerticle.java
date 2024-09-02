@@ -99,16 +99,17 @@ public class PushVerticle extends AbstractVerticle {
     }
 
     void initWebSocket(ServerWebSocket websocket, Long userId) {
+        // 获取一个WebSocket关联的Handler ID:
         String handlerId = websocket.textHandlerID();
         logger.info("websocket accept userId: " + userId + ", handlerId: " + handlerId);
-        // handle text message:
+        // handle text message，处理输入消息:
         websocket.textMessageHandler(str -> {
             logger.info("text message: " + str);
         });
         websocket.exceptionHandler(t -> {
             logger.error("websocket error: " + t.getMessage(), t);
         });
-        // on close:
+        // on close，关闭连接时:
         websocket.closeHandler(e -> {
             unsubscribeClient(handlerId);
             unsubscribeUser(handlerId, userId);
@@ -135,6 +136,7 @@ public class PushVerticle extends AbstractVerticle {
             logger.error("invalid message format: {}", text);
             return;
         }
+        // 没有用户ID时，推送给所有连接。否则推送给指定用户:
         if (message.userId == null) {
             if (logger.isInfoEnabled()) {
                 logger.info("try broadcast message to all: {}", text);

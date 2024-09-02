@@ -68,30 +68,36 @@ public class ProxyFilterRegistrationBean extends FilterRegistrationBean<Filter> 
 
         private void proxyForward(Long userId, HttpServletRequest request, HttpServletResponse response)
                 throws IOException {
+            // 构造一次性Token，使用http Authorization Bearer模式:
             String authToken = null;
             if (userId != null) {
                 AuthToken token = new AuthToken(userId, System.currentTimeMillis() + 60_000);
                 authToken = "Bearer " + token.toSecureString(hmacKey);
             }
+            // 转发到API并读取响应：
             String responseJson = null;
             try {
                 if ("GET".equals(request.getMethod())) {
                     Map<String, String[]> params = request.getParameterMap();
+                    // 转换参数，每个String[]只取第0个
                     Map<String, String> query = params.isEmpty() ? null : convertParams(params);
                     responseJson = tradingApiClient.get(String.class, request.getRequestURI(), authToken, query);
                 } else if ("POST".equals(request.getMethod())) {
                     responseJson = tradingApiClient.post(String.class, request.getRequestURI(), authToken,
                             readBody(request));
                 }
+                // 写入响应:
                 response.setContentType("application/json;charset=utf-8");
                 PrintWriter pw = response.getWriter();
                 pw.write(responseJson);
                 pw.flush();
             } catch (ApiException e) {
                 logger.warn(e.getMessage(), e);
+                // 写入错误响应:
                 writeApiException(request, response, e);
             } catch (Exception e) {
                 logger.warn(e.getMessage(), e);
+                // 写入错误响应:
                 writeApiException(request, response,
                         new ApiException(ApiError.INTERNAL_SERVER_ERROR, null, e.getMessage()));
             }

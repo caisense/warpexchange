@@ -42,11 +42,12 @@ public class PushService extends LoggerSupport {
     @PostConstruct
     public void startVertx() {
         logger.info("start vertx...");
+        // 启动Vert.x:
         this.vertx = Vertx.vertx();
-
+        // 创建一个Vert.x Verticle组件:
         var push = new PushVerticle(this.hmacKey, this.serverPort);
         vertx.deployVerticle(push);
-
+        // 连接到Redis:
         String url = "redis://" + (this.redisPassword.isEmpty() ? "" : ":" + this.redisPassword + "@") + this.redisHost
                 + ":" + this.redisPort + "/" + this.redisDatabase;
 
@@ -55,11 +56,15 @@ public class PushService extends LoggerSupport {
 
         redis.connect().onSuccess(conn -> {
             logger.info("connect to redis ok.");
+            // 连接成功事件处理:
             conn.handler(response -> {
+                // 收到Redis的PUSH:
                 if (response.type() == ResponseType.PUSH) {
                     int size = response.size();
+                    // todo size==3?
                     if (size == 3) {
                         Response type = response.get(2);
+                        // 收到PUBLISH通知:
                         if (type instanceof BulkType) {
                             String msg = type.toString();
                             if (logger.isDebugEnabled()) {
@@ -71,6 +76,7 @@ public class PushService extends LoggerSupport {
                 }
             });
             logger.info("try subscribe...");
+            // 订阅Redis的Topic:
             conn.send(Request.cmd(Command.SUBSCRIBE).arg(RedisCache.Topic.NOTIFICATION)).onSuccess(resp -> {
                 logger.info("subscribe ok.");
             }).onFailure(err -> {

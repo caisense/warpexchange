@@ -111,6 +111,10 @@ public class TradingApiController extends AbstractApiController {
         return data == null ? OrderBookBean.EMPTY : data;
     }
 
+    /**
+     * 获取最新成交信息
+     * @return
+     */
     @ResponseBody
     @GetMapping(value = "/ticks", produces = "application/json")
     public String getRecentTicks() {
@@ -125,6 +129,10 @@ public class TradingApiController extends AbstractApiController {
         return sj.toString();
     }
 
+    /**
+     * 获取今天往前一年的日k线
+     * @return
+     */
     @ResponseBody
     @GetMapping(value = "/bars/day", produces = "application/json")
     public String getDayBars() {
@@ -141,6 +149,10 @@ public class TradingApiController extends AbstractApiController {
         return getBars(RedisCache.Key.HOUR_BARS, start, end);
     }
 
+    /**
+     * 获取一天内的分钟k线
+     * @return
+     */
     @ResponseBody
     @GetMapping(value = "/bars/min", produces = "application/json")
     public String getMinBars() {
@@ -157,7 +169,15 @@ public class TradingApiController extends AbstractApiController {
         return getBars(RedisCache.Key.SEC_BARS, start, end);
     }
 
+    /**
+     * 获取k线
+     * @param key k线类型
+     * @param start
+     * @param end
+     * @return
+     */
     private String getBars(String key, long start, long end) {
+        // k线以时间为score排序，取时间在[start, end]之间的数据
         List<String> data = redisService.zrangebyscore(key, start, end);
         if (data == null || data.isEmpty()) {
             return "[]";

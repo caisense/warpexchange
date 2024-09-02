@@ -56,7 +56,7 @@ public class UIFilterRegistrationBean extends FilterRegistrationBean<Filter> {
             request.setCharacterEncoding("UTF-8");
             response.setCharacterEncoding("UTF-8");
             response.setContentType("text/html;charset=UTF-8");
-            // try parse user:
+            // try parse user，通过将cookie中的sessionStr解析出来，判断是否登录:
             AuthToken auth = cookieService.findSessionCookie(request);
             if (auth != null && auth.isAboutToExpire()) {
                 logger.info("refresh session cookie...");

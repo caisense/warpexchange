@@ -14,6 +14,7 @@ exchange:
     hmac-key: ${EXCHANGE_HMAC_KEY:ChangeThisHmacKey4ExchangeConfig}
     session-timeout: ${EXCHANGE_SESSION_TIMEOUT:P3D}
     api-endpoints:
+      # **************【语法】：在yml文件中或启动命令中查【TRADING_API】，如果没有，再取默认值http://localhost:8001
       trading-api: ${TRADING_API:http://localhost:8001}
       trading-engine-api: ${TRADING_ENGINE_API:http://localhost:8002}
 

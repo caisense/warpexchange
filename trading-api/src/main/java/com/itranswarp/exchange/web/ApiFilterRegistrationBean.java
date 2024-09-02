@@ -74,6 +74,7 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
                 chain.doFilter(request, response);
             } else {
                 // 用户身份
+                // ************* ctx未直接使用，仅用来通过ThreadLocal传递用户ID *****************
                 try (UserContext ctx = new UserContext(userId)) {
                     chain.doFilter(request, response);
                 }
@@ -87,7 +88,7 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
             if (auth != null) {
                 return parseUserFromAuthorization(auth);
             }
-            // 尝试通过API Key认证用户:
+            // todo 尝试通过API Key认证用户:
             String apiKey = request.getHeader("API-Key");
             String apiSignature = request.getHeader("API-Signature");
             if (apiKey != null && apiSignature != null) {
@@ -97,6 +98,7 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
         }
 
         Long parseUserFromAuthorization(String auth) {
+            // 用标准HTTP头 Authorization 的`Basic`模式
             if (auth.startsWith("Basic ")) {
                 // 用Base64解码
                 String eap = new String(Base64.getDecoder().decode(auth.substring(6)), StandardCharsets.UTF_8);
@@ -114,7 +116,9 @@ public class ApiFilterRegistrationBean extends FilterRegistrationBean<Filter> {
                 }
                 return userId;
             }
+            // 用标准HTTP头 Authorization 的`Bearer`模式
             if (auth.startsWith("Bearer ")) {
+                // 去掉开头的"Bearer "，再解析
                 AuthToken token = AuthToken.fromSecureString(auth.substring(7), hmacKey);
                 if (token.isExpired()) {
                     return null;
