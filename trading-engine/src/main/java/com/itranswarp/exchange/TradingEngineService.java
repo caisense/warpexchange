@@ -322,6 +322,7 @@ public class TradingEngineService extends LoggerSupport {
         if (event.previousId > this.lastSequenceId) {
             logger.warn("event lost: expected previous id {} but actual {} for event {}", this.lastSequenceId,
                     event.previousId, event);
+            // 查sequenceId > lastSequenceId的事件
             List<AbstractEvent> events = this.storeService.loadEventsFromDb(this.lastSequenceId);
             if (events.isEmpty()) {
                 logger.error("cannot load lost event from db.");
@@ -343,7 +344,7 @@ public class TradingEngineService extends LoggerSupport {
         if (logger.isDebugEnabled()) {
             logger.debug("process event {} -> {}: {}...", this.lastSequenceId, event.sequenceId, event);
         }
-        // 核心逻辑：根据事件类型处理
+        // ======== 核心逻辑：根据事件类型处理 ========
         try {
             if (event instanceof OrderRequestEvent) {
                 createOrder((OrderRequestEvent) event);
@@ -500,6 +501,9 @@ public class TradingEngineService extends LoggerSupport {
         System.out.println("========== // trading engine ==========");
     }
 
+    /**
+     * 测试方法：验证
+     */
     void validate() {
         logger.debug("start validate...");
         validateAssets();

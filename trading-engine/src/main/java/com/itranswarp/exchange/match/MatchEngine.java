@@ -63,18 +63,16 @@ public class MatchEngine {
                 // 卖出订单价格比买盘第一档价格高:
                 break;
             }
-            // 以Maker价格成交:
+            // 以Maker价格成交,则市场价更新
             this.marketPrice = makerOrder.price;
             // 待成交数量为两者较小值:
             BigDecimal matchedQuantity = takerUnfilledQuantity.min(makerOrder.unfilledQuantity);
-            // 成交记录:（价格、数量、maker
+            // 成交记录（价格、数量、maker）写入撮合匹配列表
             matchResult.add(makerOrder.price, matchedQuantity, makerOrder);
-            // 更新成交后的订单数量:
-            // taker数量减去待成交数量
+            // 更新成交后的订单数量 = taker数量 减去 待成交数量
             takerUnfilledQuantity = takerUnfilledQuantity.subtract(matchedQuantity);
             BigDecimal makerUnfilledQuantity = makerOrder.unfilledQuantity.subtract(matchedQuantity);
-            // 对手盘完全成交后，从订单簿中删除:
-            // 即看成交后的订单数是否为0
+            // 对手盘完全成交后（即看成交后的订单数是否为0），从订单簿中删除:
             if (makerUnfilledQuantity.signum() == 0) {
                 makerOrder.updateOrder(makerUnfilledQuantity, OrderStatus.FULLY_FILLED, ts);
                 makerBook.remove(makerOrder);

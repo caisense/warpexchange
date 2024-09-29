@@ -35,6 +35,7 @@ public class ClearingService extends LoggerSupport {
      * @param result
      */
     public void clearMatchResult(MatchResult result) {
+        // 匹配记录中的taker
         OrderEntity taker = result.takerOrder;
         // taker分为买和卖两种
         switch (taker.direction) {
@@ -42,7 +43,7 @@ public class ClearingService extends LoggerSupport {
             // 买入时，按Maker的价格成交：
             // 遍历撮合结果的所有匹配记录（taker对应的所有maker）
             for (MatchDetailRecord detail : result.matchDetails) {
-                // debug日志
+                // debug日志开启则打印
                 if (logger.isDebugEnabled()) {
                     logger.debug(
                             "clear buy matched detail: price = {}, quantity = {}, takerOrderId = {}, makerOrderId = {}, takerUserId = {}, makerUserId = {}",
@@ -92,8 +93,7 @@ public class ClearingService extends LoggerSupport {
                 BigDecimal matched = detail.quantity();
                 // 卖家出BTC，换买家的USD
                 /**【注意】这里不用考虑差价，因为taker是卖单时，以买单的maker.price成交。
-                    设计下单时，卖单冻结的是BTC，换成USD直接按挂单价maker.price换算即可。
-                    并不关心taker.price
+                    设计下单时，卖单冻结的是BTC，并不是USD，因此并不关心taker.price。换成USD直接按挂单价maker.price换算即可。
                     前面买单考虑差价是因为冻结的是USD，最终交易的也是USD，即taker.price与maker.price存在差价
                  **/
                 // 卖方BTC转入买方账户:
