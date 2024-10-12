@@ -251,11 +251,14 @@ public class TradingEngineService extends LoggerSupport {
     // called by dbExecutor thread only:
     private void saveToDb() throws InterruptedException {
         if (!matchQueue.isEmpty()) {
+            // 每次最多批插入1000条
             List<MatchDetailEntity> batch = new ArrayList<>(1000);
             for (;;) {
+                // 每次取出的是一个list
                 List<MatchDetailEntity> matches = matchQueue.poll();
                 if (matches != null) {
                     batch.addAll(matches);
+                    // 到达batch容量上限停止写入
                     if (batch.size() >= 1000) {
                         break;
                     }

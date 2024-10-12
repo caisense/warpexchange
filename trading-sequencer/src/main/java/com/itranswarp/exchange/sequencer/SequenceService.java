@@ -128,7 +128,7 @@ public class SequenceService extends LoggerSupport implements CommonErrorHandler
         // 定序后的事件消息
         List<AbstractEvent> sequenced = null;
         try {
-            // 定序
+            // ============== 定序 =================
             sequenced = this.sequenceHandler.sequenceMessages(this.messageTypes, this.sequence, messages);
         } catch (Throwable e) {
             logger.error("exception when do sequence", e);

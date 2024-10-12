@@ -26,7 +26,7 @@ public class SequenceHandler extends AbstractDbService {
 
     /**
      * Set sequence for each message, persist into database as batch.
-     * 
+     * 是真正写入Sequence ID并落库的过程
      * @return Sequenced messages.
      */
     public List<AbstractEvent> sequenceMessages(final MessageTypes messageTypes, final AtomicLong sequence,
@@ -94,7 +94,7 @@ public class SequenceHandler extends AbstractDbService {
             event.previousId = previousId;
             event.sequenceId = currentId;
 
-            // 将数据json序列化
+            // 将数据json序列化,格式:【类型】+ "#" +【json】
             event.data = messageTypes.serialize(message);
             event.createdAt = this.lastTimestamp; // same as message.createdAt
             events.add(event);
