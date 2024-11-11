@@ -53,6 +53,7 @@ public class SequenceHandler extends AbstractDbService {
             // check uniqueId:
             // 在【内存】或【数据库】中查找uniqueId，看是否存在
             // 存在则跳过
+            // （外层加了synchronized，因此没有并发问题）
             if (uniqueId != null) {
                 if ((uniqueKeys != null && uniqueKeys.contains(uniqueId))
                         || db.fetch(UniqueEventEntity.class, uniqueId) != null) {
@@ -75,7 +76,7 @@ public class SequenceHandler extends AbstractDbService {
 
             // 生成上次定序id
             final long previousId = sequence.get();
-            // 生成本次定序id
+            // 生成本次定序id，自增1
             final long currentId = sequence.incrementAndGet();
 
             // 先设置message的sequenceId / previouseId / createdAt，再序列化并落库:

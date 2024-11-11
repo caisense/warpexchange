@@ -77,6 +77,7 @@ public class TradingApiController extends AbstractApiController {
 
     @PostConstruct
     public void init() {
+        // 订阅redis
         this.redisService.subscribe(RedisCache.Topic.TRADING_API_RESULT, this::onApiResultMessage);
     }
 
@@ -255,6 +256,7 @@ public class TradingApiController extends AbstractApiController {
             throws IOException {
         final Long userId = UserContext.getRequiredUserId();
         orderRequest.validate();
+        // 消息的Reference ID
         final String refId = IdUtil.generateUniqueId();
         var event = new OrderRequestEvent();
         event.refId = refId;
@@ -263,15 +265,16 @@ public class TradingApiController extends AbstractApiController {
         event.price = orderRequest.price;
         event.quantity = orderRequest.quantity;
         event.createdAt = System.currentTimeMillis();
-
+        // 若超时（0.5秒）则返回400，正常则异步返回
         ResponseEntity<String> timeout = new ResponseEntity<>(getTimeoutJson(), HttpStatus.BAD_REQUEST);
         DeferredResult<ResponseEntity<String>> deferred = new DeferredResult<>(this.asyncTimeout, timeout);
         deferred.onTimeout(() -> {
             logger.warn("deferred order request refId = {} timeout.", event.refId);
             this.deferredResultMap.remove(event.refId);
         });
-        // track deferred:
+        // 根据refId跟踪消息处理结果
         this.deferredResultMap.put(event.refId, deferred);
+        // 发送消息
         this.sendEventService.sendMessage(event);
         return deferred;
     }
