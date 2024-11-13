@@ -65,6 +65,8 @@ public class TradingApiController extends AbstractApiController {
 
     private String timeoutJson = null;
 
+    // DeferredResult即”延迟结果“，它允许Spring MVC收到请求后，立即释放（归还）容器线程，使容器可以接收更多外部请求，提升吞吐量。
+    // 此时DeferredResult将陷入阻塞，直到主动将结果
     Map<String, DeferredResult<ResponseEntity<String>>> deferredResultMap = new ConcurrentHashMap<>();
 
     private String getTimeoutJson() throws IOException {
@@ -77,7 +79,7 @@ public class TradingApiController extends AbstractApiController {
 
     @PostConstruct
     public void init() {
-        // 订阅redis
+        // 订阅redis，用onApiResultMessage监听TRADING_API_RESULT消息
         this.redisService.subscribe(RedisCache.Topic.TRADING_API_RESULT, this::onApiResultMessage);
     }
 
@@ -249,6 +251,7 @@ public class TradingApiController extends AbstractApiController {
 
     /**
      * Create a new order.
+     * 外部创建订单api
      */
     @PostMapping(value = "/orders", produces = "application/json")
     @ResponseBody
@@ -258,6 +261,7 @@ public class TradingApiController extends AbstractApiController {
         orderRequest.validate();
         // 消息的Reference ID
         final String refId = IdUtil.generateUniqueId();
+        // 创建订单事件类型以发送mq
         var event = new OrderRequestEvent();
         event.refId = refId;
         event.userId = userId;
@@ -265,27 +269,35 @@ public class TradingApiController extends AbstractApiController {
         event.price = orderRequest.price;
         event.quantity = orderRequest.quantity;
         event.createdAt = System.currentTimeMillis();
-        // 若超时（0.5秒）则返回400，正常则异步返回
+        // 若超时（0.5秒）则返回400，并从deferredResultMap移除
+        // 正常则异步返回
         ResponseEntity<String> timeout = new ResponseEntity<>(getTimeoutJson(), HttpStatus.BAD_REQUEST);
         DeferredResult<ResponseEntity<String>> deferred = new DeferredResult<>(this.asyncTimeout, timeout);
+        // Timeout监听器：当DeferredResult创建出来后，执行setResult()之前，间隔超过设定值则判定超时，执行回调逻辑
         deferred.onTimeout(() -> {
             logger.warn("deferred order request refId = {} timeout.", event.refId);
             this.deferredResultMap.remove(event.refId);
         });
         // 根据refId跟踪消息处理结果
         this.deferredResultMap.put(event.refId, deferred);
-        // 发送消息
+        // 发送mq
         this.sendEventService.sendMessage(event);
         return deferred;
     }
 
-    // message callback ///////////////////////////////////////////////////////
 
+    /**
+     * 收到redis推送消息结果，触发的监听回调
+     * @param msg
+     *
+     */
     public void onApiResultMessage(String msg) {
         logger.info("on subscribed message: {}", msg);
         try {
             ApiResultMessage message = objectMapper.readValue(msg, ApiResultMessage.class);
             if (message.refId != null) {
+                // 根据refId跟踪消息处理结果
+                // 因为所有订单处理都会推送redis，因此需要用筛选那些是走api的订单请求，并且用refId跟踪是具体哪次api调用
                 DeferredResult<ResponseEntity<String>> deferred = this.deferredResultMap.remove(message.refId);
                 if (deferred != null) {
                     if (message.error != null) {

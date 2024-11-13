@@ -118,13 +118,16 @@ public class TradingEngineService extends LoggerSupport {
         this.consumer = this.messagingFactory.createBatchMessageListener(Messaging.Topic.TRADE, IpUtil.getHostId(),
                 this::processMessages);
         this.producer = this.messagingFactory.createMessageProducer(Topic.TICK, TickMessage.class);
+
         this.tickThread = new Thread(this::runTickThread, "async-tick");
         this.tickThread.start();
+        // 消息推送redis线程
         this.notifyThread = new Thread(this::runNotifyThread, "async-notify");
         this.notifyThread.start();
         // 异步输出OrderBook线程
         this.orderBookThread = new Thread(this::runOrderBookThread, "async-orderbook");
         this.orderBookThread.start();
+        // api结果推送redis线程
         this.apiResultThread = new Thread(this::runApiResultThread, "async-api-result");
         this.apiResultThread.start();
         // 异步落库线程
@@ -192,6 +195,7 @@ public class TradingEngineService extends LoggerSupport {
     private void runApiResultThread() {
         logger.info("start publish api result to redis...");
         for (;;) {
+            // 从api结果队列取出一个，推送到redis的TRADING_API_RESULT主题
             ApiResultMessage result = this.apiResultQueue.poll();
             if (result != null) {
                 redisService.publish(RedisCache.Topic.TRADING_API_RESULT, JsonUtil.writeJson(result));
@@ -465,7 +469,7 @@ public class TradingEngineService extends LoggerSupport {
     }
 
     MatchDetailEntity generateMatchDetailEntity(long sequenceId, long timestamp, MatchDetailRecord detail,
-            boolean forTaker) {
+                                                boolean forTaker) {
         MatchDetailEntity d = new MatchDetailEntity();
         d.sequenceId = sequenceId;
         d.orderId = forTaker ? detail.takerOrder().id : detail.makerOrder().id;
@@ -539,13 +543,13 @@ public class TradingEngineService extends LoggerSupport {
                     require(asset.getFrozen().signum() >= 0, "Trader has negative frozen: " + asset);
                 }
                 switch (assetId) {
-                case USD -> {
-                    totalUSD = totalUSD.add(asset.getTotal());
-                }
-                case BTC -> {
-                    totalBTC = totalBTC.add(asset.getTotal());
-                }
-                default -> require(false, "Unexpected asset id: " + assetId);
+                    case USD -> {
+                        totalUSD = totalUSD.add(asset.getTotal());
+                    }
+                    case BTC -> {
+                        totalBTC = totalBTC.add(asset.getTotal());
+                    }
+                    default -> require(false, "Unexpected asset id: " + assetId);
                 }
             }
         }
@@ -561,27 +565,27 @@ public class TradingEngineService extends LoggerSupport {
             OrderEntity order = entry.getValue();
             require(order.unfilledQuantity.signum() > 0, "Active order must have positive unfilled amount: " + order);
             switch (order.direction) {
-            case BUY -> {
-                // 订单必须在MatchEngine中:
-                require(this.matchEngine.buyBook.exist(order), "order not found in buy book: " + order);
-                // 累计冻结的USD:
-                userOrderFrozen.putIfAbsent(order.userId, new HashMap<>());
-                Map<AssetEnum, BigDecimal> frozenAssets = userOrderFrozen.get(order.userId);
-                frozenAssets.putIfAbsent(AssetEnum.USD, BigDecimal.ZERO);
-                BigDecimal frozen = frozenAssets.get(AssetEnum.USD);
-                frozenAssets.put(AssetEnum.USD, frozen.add(order.price.multiply(order.unfilledQuantity)));
-            }
-            case SELL -> {
-                // 订单必须在MatchEngine中:
-                require(this.matchEngine.sellBook.exist(order), "order not found in sell book: " + order);
-                // 累计冻结的BTC:
-                userOrderFrozen.putIfAbsent(order.userId, new HashMap<>());
-                Map<AssetEnum, BigDecimal> frozenAssets = userOrderFrozen.get(order.userId);
-                frozenAssets.putIfAbsent(AssetEnum.BTC, BigDecimal.ZERO);
-                BigDecimal frozen = frozenAssets.get(AssetEnum.BTC);
-                frozenAssets.put(AssetEnum.BTC, frozen.add(order.unfilledQuantity));
-            }
-            default -> require(false, "Unexpected order direction: " + order.direction);
+                case BUY -> {
+                    // 订单必须在MatchEngine中:
+                    require(this.matchEngine.buyBook.exist(order), "order not found in buy book: " + order);
+                    // 累计冻结的USD:
+                    userOrderFrozen.putIfAbsent(order.userId, new HashMap<>());
+                    Map<AssetEnum, BigDecimal> frozenAssets = userOrderFrozen.get(order.userId);
+                    frozenAssets.putIfAbsent(AssetEnum.USD, BigDecimal.ZERO);
+                    BigDecimal frozen = frozenAssets.get(AssetEnum.USD);
+                    frozenAssets.put(AssetEnum.USD, frozen.add(order.price.multiply(order.unfilledQuantity)));
+                }
+                case SELL -> {
+                    // 订单必须在MatchEngine中:
+                    require(this.matchEngine.sellBook.exist(order), "order not found in sell book: " + order);
+                    // 累计冻结的BTC:
+                    userOrderFrozen.putIfAbsent(order.userId, new HashMap<>());
+                    Map<AssetEnum, BigDecimal> frozenAssets = userOrderFrozen.get(order.userId);
+                    frozenAssets.putIfAbsent(AssetEnum.BTC, BigDecimal.ZERO);
+                    BigDecimal frozen = frozenAssets.get(AssetEnum.BTC);
+                    frozenAssets.put(AssetEnum.BTC, frozen.add(order.unfilledQuantity));
+                }
+                default -> require(false, "Unexpected order direction: " + order.direction);
             }
         }
         // 订单冻结的累计金额必须和Asset冻结一致:
