@@ -86,7 +86,7 @@ public class PushVerticle extends AbstractVerticle {
 
         // 处理其他请求:
         router.get().respond(ctx -> ctx.response().setStatusCode(404).setStatusMessage("No Route Found").end());
-
+        // 绑定路由并监听端口:
         server.requestHandler(router).listen(this.serverPort, result -> {
             if (result.succeeded()) {
                 logger.info("Vertx started on port(s): {} (http) with context path ''", this.serverPort);
@@ -98,6 +98,11 @@ public class PushVerticle extends AbstractVerticle {
         });
     }
 
+    /**
+     * 升级到WebSocket连接后的后续处理
+     * @param websocket
+     * @param userId
+     */
     void initWebSocket(ServerWebSocket websocket, Long userId) {
         // 获取一个WebSocket关联的Handler ID:
         String handlerId = websocket.textHandlerID();
@@ -115,6 +120,7 @@ public class PushVerticle extends AbstractVerticle {
             unsubscribeUser(handlerId, userId);
             logger.info("websocket closed: " + handlerId);
         });
+        // 记录Handler ID
         subscribeClient(handlerId);
         subscribeUser(handlerId, userId);
         // send welcome message:
@@ -128,6 +134,10 @@ public class PushVerticle extends AbstractVerticle {
         }
     }
 
+    /**
+     * 向用户主动推送通知
+     * @param text
+     */
     public void broadcast(String text) {
         NotificationMessage message = null;
         try {
